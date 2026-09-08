@@ -38,7 +38,7 @@ permissions:
   attestations: write # for GitHub Attestations.
 jobs:
   fitness:
-    uses: finos-osera/osera-fitness-checks/.github/workflows/fitness.yaml@v0.1.0
+    uses: finos-osera/osera-fitness-checks/.github/workflows/fitness.yaml@v1
     with:
       tag: ${{ github.ref_name }}
 ```
@@ -61,6 +61,10 @@ Outputs:
 - [actions/upload-artifact](https://github.com/actions/upload-artifact)
 
 Verify a result: `gh attestation verify result.json --repo <patch repo> --signer-repo <this repo> --predicate-type https://osera.finos.org/fitness-result/v1`.
+
+## Versioning
+
+Callers pin the moving major tag, `@v1`. Releases are exact tags (`v1.0.0`, `v1.0.1`, `v1.1.0`) and `v1` is moved to the latest of them only after the e2e workflow is green, so a producer's repository never changes and still receives fixes. A breaking change becomes `v2` and a pull request on every caller. Every result records the exact library commit that produced it, which is what the gate checks.
 
 ## Actions
 
