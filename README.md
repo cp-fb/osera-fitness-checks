@@ -45,10 +45,7 @@ jobs:
 
 Inputs:
 
-- `tag` (string, required): the release tag under test, for example `v2.14.2+osera-patch.001`.
-- `repository` (string, default the calling repository): the patch repository to check, `owner/name`.
-- `expected-org` (string, default `finos-osera`): the organisation the patch repositories must live in (FORK-001).
-- `library-ref` (string, default `main`): which version of this library to run the checks from.
+- `tag` (string, required): the release tag under test, for example `v2.14.2+osera-patch.001`. Nothing else: the organisation FORK-001 expects, the library version the actions run from and the repository under test are fixed in the workflow file or derived from the run itself, never taken from the caller.
 
 Outputs:
 
@@ -113,7 +110,7 @@ One status per standard is the worst of its requirements; not applicable never o
 ## Testing
 
 - [lint](.github/workflows/lint.yaml): actionlint on the workflows, shellcheck on every action's bash.
-- [e2e](.github/workflows/e2e.yaml): runs the fitness workflow itself against the playground fork at its release tag and compares every status with [`e2e/expected.txt`](e2e/expected.txt).
+- [e2e](.github/workflows/e2e.yaml): runs the fitness workflow itself against the reference repository at its release tag (the workflow picks the reference when its caller is the library) and compares every status with [`e2e/expected.txt`](e2e/expected.txt).
 
 ## Notes
 

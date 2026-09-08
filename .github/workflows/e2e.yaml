@@ -8,7 +8,7 @@ on:
 
 jobs:
   fitness:
-    # every check against the playground fork at its release tag, through the reusable workflow itself
+    # every check against the reference repository at its release tag, through the reusable workflow itself (the workflow picks the reference when the caller is the library)
     uses: ./.github/workflows/fitness.yaml
     permissions:
       contents: read # for checking out the fixture.
@@ -16,9 +16,6 @@ jobs:
       attestations: write # for GitHub Attestations.
     with:
       tag: v2.14.2+osera-patch.001
-      repository: d1gital-f/patch-jackson-core
-      expected-org: d1gital-f
-      library-ref: ${{ github.sha }}
   compare:
     needs: [fitness]
     runs-on: ubuntu-latest

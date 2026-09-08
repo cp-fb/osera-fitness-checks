@@ -7,25 +7,17 @@ on:
         description: 'the release tag under test, for example v2.14.2+osera-patch.001'
         required: true
         type: string
-      repository:
-        description: 'the patch repository to check (owner/name); defaults to the calling repository'
-        required: false
-        default: ${{ github.repository }}
-        type: string
-      expected-org:
-        description: 'organisation the patch repositories must live in (FORK-001)'
-        required: false
-        default: 'finos-osera'
-        type: string
-      library-ref:
-        description: 'which version of this library to run the checks from'
-        required: false
-        default: 'main'
-        type: string
     outputs:
       result:
         description: 'pass, warn or fail'
         value: ${{ jobs.fitness.outputs.result }}
+
+# Fixed in this file, never taken from the caller: where this library lives (also the organisation FORK-001 expects),
+# and the reference repository the library's own e2e checks. At the move to finos-osera these two lines change.
+env:
+  LIBRARY: d1gital-f/osera-fitness-checks
+  LIBRARY_REF: v1 # the moving major tag the callers pin; the actions are checked out at it too, and the result records the exact commit
+  REFERENCE: d1gital-f/patch-jackson-core
 
 jobs:
   fitness:
@@ -37,10 +29,17 @@ jobs:
       id-token: write # for creating OIDC tokens for signing.
       attestations: write # for GitHub Attestations.
     steps:
+      - name: The repository under test is the caller, or the reference when the library tests itself
+        id: target
+        env:
+          CALLER: ${{ github.repository }}
+        run: |
+          if [ "$CALLER" = "$LIBRARY" ]; then echo "repository=$REFERENCE" >> "$GITHUB_OUTPUT"; else echo "repository=$CALLER" >> "$GITHUB_OUTPUT"; fi
+          echo "owner=${LIBRARY%%/*}" >> "$GITHUB_OUTPUT"
       - name: Checkout the patch repository at the tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
           ref: ${{ inputs.tag }}
           fetch-depth: 0
       - name: Fetch every branch and tag
@@ -48,82 +47,86 @@ jobs:
       - name: Checkout the osera-fitness-checks library
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ github.repository_owner }}/osera-fitness-checks
-          ref: ${{ inputs.library-ref }}
+          repository: ${{ env.LIBRARY }}
+          ref: ${{ env.LIBRARY_REF }}
           path: .osera-fitness
+      - name: The exact library commit the checks run from, recorded in the result
+        id: library
+        run: echo "commit=$(git -C .osera-fitness rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: FORK-001.REQ-001
         uses: ./.osera-fitness/.github/actions/fork-001-req-001
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
-          expected-org: ${{ inputs.expected-org }}
+          repository: ${{ steps.target.outputs.repository }}
+          expected-org: ${{ steps.target.outputs.owner }}
       - name: FORK-001.REQ-002
         uses: ./.osera-fitness/.github/actions/fork-001-req-002
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: FORK-002.REQ-001
         uses: ./.osera-fitness/.github/actions/fork-002-req-001
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: FORK-003.REQ-001
         uses: ./.osera-fitness/.github/actions/fork-003-req-001
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: SRC-002.REQ-001
         uses: ./.osera-fitness/.github/actions/src-002-req-001
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: SRC-002.REQ-002
         uses: ./.osera-fitness/.github/actions/src-002-req-002
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: SRC-003.REQ-001
         uses: ./.osera-fitness/.github/actions/src-003-req-001
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: REL-001.REQ-001
         uses: ./.osera-fitness/.github/actions/rel-001-req-001
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: CP-REL-004-01 (proposal)
         uses: ./.osera-fitness/.github/actions/proposal-rel-004-producer-named
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: CP-REL-004-02 (proposal)
         uses: ./.osera-fitness/.github/actions/proposal-rel-004-producer-in-registry
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: CP-REL-004-03 (proposal)
         uses: ./.osera-fitness/.github/actions/proposal-rel-004-accounts-in-entry
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: Write the result
         id: result
         uses: ./.osera-fitness/.github/actions/write-result
         with:
           tag: ${{ inputs.tag }}
-          repository: ${{ inputs.repository }}
+          library: ${{ env.LIBRARY }}@${{ steps.library.outputs.commit }}
+          repository: ${{ steps.target.outputs.repository }}
       - name: Attest the result
         id: attest
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
