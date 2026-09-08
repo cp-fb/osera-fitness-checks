@@ -45,7 +45,10 @@ jobs:
 
 Inputs:
 
-- `tag` (string, required): the release tag under test, for example `v2.14.2+osera-patch.001`. Nothing else: the organisation FORK-001 expects, the library version the actions run from and the repository under test are fixed in the workflow file or derived from the run itself, never taken from the caller.
+- `tag` (string, required): the release tag under test, for example `v2.14.2+osera-patch.001`.
+- `reference` (string, ignored unless the caller is the library itself): which reference repository the library's own e2e checks.
+
+Nothing else: the organisation FORK-001 expects, the library version the actions run from and the repository under test are fixed in the workflow file or derived from the run itself, never taken from the caller.
 
 Outputs:
 
@@ -110,7 +113,7 @@ One status per standard is the worst of its requirements; not applicable never o
 ## Testing
 
 - [lint](.github/workflows/lint.yaml): actionlint on the workflows, shellcheck on every action's bash.
-- [e2e](.github/workflows/e2e.yaml): runs the fitness workflow itself against the reference repository at its release tag (the workflow picks the reference when its caller is the library) and compares every status with [`e2e/expected.txt`](e2e/expected.txt).
+- [e2e](.github/workflows/e2e.yaml): runs the fitness workflow itself against two reference repositories at their release tags (the workflow honours the `reference` input only when its caller is the library): the known good, `patch-jackson-core`, and the known mistakes, `patch-commons-codec` (no baseline tag, a fix without an upstream link, a producer name with a typo), each compared with its expected list under [`e2e/`](e2e/). A check that cannot run at all records `not-tested` rather than disappearing from the result.
 
 ## Notes
 

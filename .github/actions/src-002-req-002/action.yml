@@ -41,6 +41,7 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
+        check_is SRC-002 SRC-002.REQ-002 "SRC-002.CHECK-002"
         # a commit carries upstream authored code when its message names an upstream commit
         TOTAL="$(git rev-list --count "${BASE}..${OSERA_TAG}")"
         CARRYING="$(git log --format=%H "${BASE}..${OSERA_TAG}" -i --extended-regexp --grep="(cherry picked from commit|backport of|upstream commit|upstream:) *[0-9a-f]{7,40}")"

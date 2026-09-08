@@ -41,6 +41,7 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
+        check_is REL-004 CP-REL-004-02 ""
         F=.osera/patch-evidence.yaml
         [ -f "$F" ] || { record REL-004 CP-REL-004-02 "" warn "$F missing"; exit 0; }
         P="$(yq -r '.producer // ""' "$F")"; N="$(yq '.producers | length' "$OSERA_APPROVED_PRODUCERS")"

@@ -41,6 +41,7 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
+        check_is FORK-002 FORK-002.REQ-001 "FORK-002.CHECK-001"
         BRANCH="patch/${VERSION}"
         REF="refs/remotes/origin/${BRANCH}"; git rev-parse -q --verify "$REF" >/dev/null || REF="refs/heads/${BRANCH}"
         if ! git rev-parse -q --verify "$REF" >/dev/null; then record FORK-002 FORK-002.REQ-001 FORK-002.CHECK-001 fail "branch $BRANCH does not exist"

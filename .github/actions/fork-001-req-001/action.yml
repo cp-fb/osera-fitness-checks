@@ -41,6 +41,7 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
+        check_is FORK-001 FORK-001.REQ-001 "FORK-001.CHECK-001"
         ORG="${OSERA_REPOSITORY%%/*}"
         if [ "$ORG" = "$OSERA_EXPECTED_ORG" ]; then record FORK-001 FORK-001.REQ-001 FORK-001.CHECK-001 pass "repository $OSERA_REPOSITORY is in $OSERA_EXPECTED_ORG"
         else record FORK-001 FORK-001.REQ-001 FORK-001.CHECK-001 fail "repository $OSERA_REPOSITORY is not in $OSERA_EXPECTED_ORG"; fi

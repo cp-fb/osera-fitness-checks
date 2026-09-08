@@ -41,6 +41,7 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
+        check_is REL-001 REL-001.REQ-001 "REL-001.CHECK-001"
         F=.osera/patch-evidence.yaml
         [ -f "$F" ] || record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "$F missing"
         MISSING=""; for K in commit command runtime report result; do V="$(yq -r ".tests.$K // \"\"" "$F")"; [ -n "$V" ] || MISSING="$MISSING $K"; done

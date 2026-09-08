@@ -41,6 +41,7 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
+        check_is SRC-002 SRC-002.REQ-001 "SRC-002.CHECK-001"
         F=.osera/patch-evidence.yaml
         [ -f "$F" ] || record SRC-002 SRC-002.REQ-001 SRC-002.CHECK-001 fail "$F missing"
         COUNT="$(yq '.fixes | length' "$F")"

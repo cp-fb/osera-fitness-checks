@@ -41,6 +41,7 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
+        check_is FORK-001 FORK-001.REQ-002 "FORK-001.CHECK-002"
         NAME="${OSERA_REPOSITORY##*/}"
         case "$NAME" in
           patch-?*) record FORK-001 FORK-001.REQ-002 FORK-001.CHECK-002 pass "repository name $NAME uses the patch- prefix" ;;

@@ -7,6 +7,11 @@ on:
         description: 'the release tag under test, for example v2.14.2+osera-patch.001'
         required: true
         type: string
+      reference:
+        description: 'only for the library testing itself: which reference repository to check (owner/name); ignored for every other caller'
+        required: false
+        default: ''
+        type: string
     outputs:
       result:
         description: 'pass, warn or fail'
@@ -35,11 +40,13 @@ jobs:
           CALLER: ${{ github.repository }}
           OSERA_TAG: ${{ inputs.tag }}
           THIS_COMMIT: ${{ github.sha }}
+          REFERENCE_INPUT: ${{ inputs.reference }}
         run: |
           # a producer's run checks the producer's repository with the actions at the released tag;
           # the library's own e2e checks the reference with the actions at the commit under test
-          if [ "$CALLER" = "$LIBRARY" ]; then TARGET="$REFERENCE"; REF="$THIS_COMMIT"; else TARGET="$CALLER"; REF="$LIBRARY_REF"; fi
+          if [ "$CALLER" = "$LIBRARY" ]; then TARGET="${REFERENCE_INPUT:-$REFERENCE}"; REF="$THIS_COMMIT"; else TARGET="$CALLER"; REF="$LIBRARY_REF"; fi
           echo "repository=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "name=${TARGET##*/}" >> "$GITHUB_OUTPUT"
           echo "owner=${LIBRARY%%/*}" >> "$GITHUB_OUTPUT"
           echo "library-ref=$REF" >> "$GITHUB_OUTPUT"
           echo "checking $TARGET at $OSERA_TAG, library $LIBRARY at $REF"
@@ -148,7 +155,7 @@ jobs:
       - name: Upload the result and its bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: osera-fitness-result
+          name: osera-fitness-result-${{ steps.target.outputs.name }}
           path: |
             result.json
             result.sigstore.json

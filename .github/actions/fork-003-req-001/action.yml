@@ -41,6 +41,7 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
+        check_is FORK-003 FORK-003.REQ-001 "FORK-003.CHECK-001"
         SHA="$(git rev-parse -q --verify "refs/tags/${BASE}^{commit}" || true)"
         if [ -z "$SHA" ]; then record FORK-003 FORK-003.REQ-001 FORK-003.CHECK-001 fail "tag $BASE missing"
         elif git merge-base --is-ancestor "$SHA" "refs/tags/$OSERA_TAG"; then record FORK-003 FORK-003.REQ-001 FORK-003.CHECK-001 pass "$BASE resolves to $SHA and is an ancestor of $OSERA_TAG"
