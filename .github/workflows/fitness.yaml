@@ -160,6 +160,8 @@ jobs:
             result.json
             result.sigstore.json
       - name: Blocking checks decide
+        # a producer's run is red when a blocking check failed; when the library tests itself the compare job decides instead
+        if: ${{ github.repository != env.LIBRARY }}
         env:
           RESULT: ${{ steps.result.outputs.result }}
         run: test "$RESULT" != "fail"
