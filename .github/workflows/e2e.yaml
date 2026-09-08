@@ -42,7 +42,9 @@ jobs:
           pattern: osera-fitness-result-*
       - name: Compare with the expected statuses
         run: |
+          failed=0
           for ref in patch-jackson-core patch-commons-codec; do
             jq -r '(.requirements + .proposals)[] | "\(.requirement) \(.status)"' "osera-fitness-result-$ref/result.json" > "actual-$ref.txt"
-            diff "e2e/expected-$ref.txt" "actual-$ref.txt" && echo "e2e $ref: every status as expected"
+            if diff "e2e/expected-$ref.txt" "actual-$ref.txt"; then echo "e2e $ref: every status as expected"; else echo "e2e $ref: DIFFERS from the expected list"; failed=1; fi
           done
+          exit "$failed"

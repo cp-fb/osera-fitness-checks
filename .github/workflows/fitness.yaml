@@ -24,6 +24,7 @@ jobs:
     # the tag the actions are checked out at, and the reference repository the library's own e2e checks.
     # At the move to finos-osera these lines change and nothing else.
     env:
+      GH_TOKEN: ${{ github.token }} # the checks read commits through the API; the job's own token, read only
       LIBRARY: d1gital-f/osera-fitness-checks
       LIBRARY_REF: v1 # the moving major tag the callers pin; the result records the exact commit it resolved to
       REFERENCE: d1gital-f/patch-jackson-core
