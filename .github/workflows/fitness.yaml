@@ -45,7 +45,7 @@ jobs:
           fetch-depth: 0
       - name: Fetch every branch and tag
         run: git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*' && git fetch --tags origin
-      - name: Checkout the check library
+      - name: Checkout the osera-fitness-checks library
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/osera-fitness-checks
