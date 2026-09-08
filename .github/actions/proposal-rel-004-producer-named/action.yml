@@ -12,6 +12,8 @@ runs:
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
         check_is REL-004 CP-REL-004-01 ""
         F=.osera/patch-evidence.yaml
-        [ -f "$F" ] || { record REL-004 CP-REL-004-01 "" warn "$F missing"; exit 0; }
-        P="$(yq -r '.producer // ""' "$F")"
-        if [ -n "$P" ]; then record REL-004 CP-REL-004-01 "" pass "producer named: $P"; else record REL-004 CP-REL-004-01 "" warn "no producer line in $F"; fi
+        expect "$F names the producer (producer: <id as in the approved producers file>)"
+        step "reading $F"
+        [ -f "$F" ] || { record warn "$F is not in the repository at $OSERA_TAG"; exit 0; }
+        P="$(ev yq -r '.producer // ""' "$F")"
+        if [ -n "$P" ]; then record pass "producer: $P"; else record warn "no producer line in $F"; fi

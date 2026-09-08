@@ -10,27 +10,33 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
-        check_is SRC-003 SRC-003.REQ-001 "SRC-003.CHECK-001"
-        git rev-parse -q --verify "refs/tags/${BASE}^{commit}" >/dev/null   # no baseline tag, no range to look at: not-tested
-        # the leading block comment of a file, years replaced by YEAR, whitespace and asterisks removed; empty when the file does not start with one
-        header() { git show "${OSERA_TAG}:$1" | awk 'BEGIN{c=0} c==0 && /^[[:space:]]*$/ {next} c==0 && $0 !~ /^[[:space:]]*\/\*/ {exit} {c=1; print} /\*\// {exit}' | sed -E 's/(19|20)[0-9]{2}([[:space:]]*[-,][[:space:]]*(19|20)[0-9]{2})*/YEAR/g' | tr -d " \t\r\n*"; }
-        # the nearest existing file of the same extension and kind (test or main), walking up the directories
+        check_is SRC-003 SRC-003.REQ-001 SRC-003.CHECK-001
+        expect "every Java source or test file added between $BASE and $OSERA_TAG carries the licence header of the nearest existing file of the same kind in the same module (years, whitespace and asterisks ignored)"
+        step "resolving the baseline tag $BASE"
+        ev git rev-parse -q --verify "refs/tags/${BASE}^{commit}" >/dev/null
+        # the leading block comment of a file at a revision, years replaced by YEAR, whitespace and asterisks removed;
+        # empty when the file does not start with one. awk reads the whole stream, so git never gets a broken pipe
+        header() { git show "$1:$2" | awk 'BEGIN{c=0; d=0} d==1 {next} c==0 && /^[[:space:]]*$/ {next} c==0 && $0 !~ /^[[:space:]]*\/\*/ {d=1; next} {c=1; print} /\*\// {d=1}' | sed -E 's/(19|20)[0-9]{2}([[:space:]]*[-,][[:space:]]*(19|20)[0-9]{2})*/YEAR/g' | tr -d " \t\r\n*"; }
+        # the nearest file of the same extension and kind (test or main) that already existed at the baseline, walking up the directories
         nearest() { local P="$1" D K F; case "$P" in */test/*) K="test" ;; *) K="main" ;; esac; D="$(dirname "$P")"
           while [ "$D" != "." ] && [ "$D" != "/" ]; do
-            for F in $(git ls-tree -r --name-only "$OSERA_TAG" "$D"); do
-              [ "$F" = "$P" ] && continue; [ "${F##*.}" = "${P##*.}" ] || continue
+            while IFS= read -r F; do
+              [ -n "$F" ] || continue; [ "${F##*.}" = "${P##*.}" ] || continue
               case "$F" in */test/*) [ "$K" = test ] || continue ;; *) [ "$K" = main ] || continue ;; esac
-              echo "$F"; return; done
+              echo "$F"; return; done < <(git ls-tree -r --name-only "$BASE" -- "$D")
             D="$(dirname "$D")"; done; }
-        ADDED="$(git diff --name-only --diff-filter=A "$BASE" "$OSERA_TAG" | grep -E '\.(java|kt|groovy|scala)$' || true)"
-        if [ -z "$ADDED" ]; then record SRC-003 SRC-003.REQ-001 SRC-003.CHECK-001 not-applicable "no new source or test files since $BASE"; exit 0; fi
-        CHECKED=0; PROBLEMS=""
-        for P in $ADDED; do
-          N="$(nearest "$P")"; [ -n "$N" ] || continue
-          REF="$(header "$N")"; [ -n "$REF" ] || continue
+        step "listing the files added since $BASE"
+        ADDED="$(ev git diff --name-only --diff-filter=A "$BASE" "$OSERA_TAG" -- '*.java' '*.kt' '*.groovy' '*.scala')"
+        if [ -z "$ADDED" ]; then record not-applicable "no Java source or test file added between $BASE and $OSERA_TAG"; exit 0; fi
+        CHECKED=0; PROBLEMS=""; LINES=""
+        while IFS= read -r P; do
+          [ -n "$P" ] || continue
+          N="$(nearest "$P")"; if [ -z "$N" ]; then LINES="$LINES; $P: no existing file of the same kind nearby"; continue; fi
+          REF="$(header "$BASE" "$N")"; if [ -z "$REF" ]; then LINES="$LINES; $P: the neighbour $N has no header block"; continue; fi
           CHECKED=$((CHECKED+1))
-          [ "$(header "$P")" = "$REF" ] || PROBLEMS="$PROBLEMS $P (expected the header of $N);"
-        done
-        if [ "$CHECKED" = 0 ]; then record SRC-003 SRC-003.REQ-001 SRC-003.CHECK-001 not-applicable "$(echo "$ADDED" | wc -l | tr -d " ") new file(s), no determinable header convention nearby"
-        elif [ -n "$PROBLEMS" ]; then record SRC-003 SRC-003.REQ-001 SRC-003.CHECK-001 fail "header differs on:$PROBLEMS"
-        else record SRC-003 SRC-003.REQ-001 SRC-003.CHECK-001 pass "$CHECKED new file(s) carry the local header convention"; fi
+          if [ "$(header "$OSERA_TAG" "$P")" = "$REF" ]; then LINES="$LINES; $P: header matches $N"; else PROBLEMS="$PROBLEMS $P"; LINES="$LINES; $P: header differs from $N"; fi
+        done <<<"$ADDED"
+        N_ADDED="$(wc -l <<<"$ADDED" | tr -d ' ')"
+        if [ "$CHECKED" = 0 ]; then record not-applicable "$N_ADDED new file(s), no header convention to compare against${LINES}"
+        elif [ -n "$PROBLEMS" ]; then record fail "header differs on:$PROBLEMS${LINES}"
+        else record pass "$CHECKED of $N_ADDED new file(s) compared, all carry the local header convention${LINES}"; fi

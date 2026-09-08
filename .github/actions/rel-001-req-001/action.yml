@@ -10,17 +10,26 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
-        check_is REL-001 REL-001.REQ-001 "REL-001.CHECK-001"
+        check_is REL-001 REL-001.REQ-001 REL-001.CHECK-001
         F=.osera/patch-evidence.yaml
-        [ -f "$F" ] || record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "$F missing"
+        expect "$F has a tests block with commit (the tagged commit, or an earlier one followed only by OSERA plumbing), command, runtime, report and result pass"
+        step "reading $F"
+        [ -f "$F" ] || record fail "$F is not in the repository at $OSERA_TAG"
+        ev yq '.tests // {}' "$F" >/dev/null
         MISSING=""; for K in commit command runtime report result; do V="$(yq -r ".tests.$K // \"\"" "$F")"; [ -n "$V" ] || MISSING="$MISSING $K"; done
-        [ -z "$MISSING" ] || record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "tests block missing:$MISSING"
-        HEAD_SHA="$(git rev-parse "refs/tags/${OSERA_TAG}^{commit}")"; TESTED="$(yq -r .tests.commit "$F")"
-        if [ "${HEAD_SHA#"$TESTED"}" = "$HEAD_SHA" ]; then
-          # the release tag may sit after the tested commit when the commits in between only add OSERA plumbing: the evidence file, the caller workflow
-          EXTRA="$(git diff --name-only "$TESTED" "$HEAD_SHA" | grep -vE '^(\.osera/patch-evidence\.yaml|\.github/workflows/osera-fitness\.ya?ml)$' || true)"
-          if [ -n "$EXTRA" ] || [ -z "$(git diff --name-only "$TESTED" "$HEAD_SHA")" ]; then record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "tested commit ${TESTED:0:12} differs from the tagged commit ${HEAD_SHA:0:12} beyond the OSERA plumbing files: $(echo "$EXTRA" | paste -sd, -)"; fi
+        [ -z "$MISSING" ] || record fail "tests block missing:$MISSING"
+        REL_SHA="$(ev git rev-parse "refs/tags/${OSERA_TAG}^{commit}")"; TESTED="$(yq -r .tests.commit "$F")"
+        step "resolving tests.commit $TESTED"
+        TESTED_SHA="$(ev git rev-parse -q --verify "${TESTED}^{commit}" || true)"
+        [ -n "$TESTED_SHA" ] || record fail "tests.commit $TESTED is not a commit of this repository"
+        WHERE="the tagged commit"
+        if [ "$TESTED_SHA" != "$REL_SHA" ]; then
+          ev git merge-base --is-ancestor "$TESTED_SHA" "$REL_SHA" >/dev/null || record fail "tests.commit $TESTED_SHA is not an ancestor of the tagged commit $REL_SHA"
+          CHANGED="$(ev git diff --name-only "$TESTED_SHA" "$REL_SHA")"
+          EXTRA="$(grep -vE '^(\.osera/patch-evidence\.yaml|\.github/workflows/osera-fitness\.ya?ml)$' <<<"$CHANGED" || true)"
+          [ -z "$EXTRA" ] || record fail "files changed after the tested commit $TESTED_SHA beyond the OSERA plumbing: $(paste -sd, - <<<"$EXTRA")"
+          WHERE="$(wc -l <<<"$CHANGED" | tr -d ' ') plumbing file(s) changed after it, nothing else"
         fi
-        RESULT="$(yq -r .tests.result "$F" | tr "[:upper:]" "[:lower:]")"
-        [ "$RESULT" = pass ] || record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "test result is $RESULT, not pass"
-        record REL-001 REL-001.REQ-001 REL-001.CHECK-001 pass "tests on ${HEAD_SHA:0:12}: $(yq -r .tests.command "$F") on $(yq -r .tests.runtime "$F"), report $(yq -r .tests.report "$F"), result pass (report contents checked at the gate)"
+        RESULT="$(yq -r .tests.result "$F" | tr '[:upper:]' '[:lower:]')"
+        [ "$RESULT" = pass ] || record fail "tests.result is $RESULT, not pass"
+        record pass "tests ran on ${TESTED_SHA:0:12} ($WHERE): $(yq -r .tests.command "$F") on $(yq -r .tests.runtime "$F"), report $(yq -r .tests.report "$F"), result pass; the report contents are checked at the gate"

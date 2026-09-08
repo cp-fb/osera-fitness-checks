@@ -19,11 +19,11 @@ The [fitness](.github/workflows/fitness.yaml) workflow checks a patch repository
 - Checks out the patch repository at the tag, with every branch and tag, and this library next to it.
 - Runs one action per requirement of OSERA-SP-0.1.0 that can be checked on the source (table below). Each writes one record.
 - Runs the ControlPlane proposals (REL-004 early warnings), which warn and never fail the run.
-- Writes `result.json` in the shape of the [fitness page](https://standards.osera.finos.org/fitness/), one status per standard, with the per requirement records and the proposals underneath.
+- Writes `result.json` with the [fitness page](https://standards.osera.finos.org/fitness/)'s fields: one entry per requirement saying what was expected, what was observed and the commands and outputs that showed it, one status per standard, the proposals underneath. Records are written outside the checkout, so nothing a producer commits can pre fill them.
 - Attests `result.json` with GitHub Attestations: an in-toto statement, predicate type `https://osera.finos.org/fitness-result/v1`, signed with the workflow's OIDC identity through Sigstore, stored by GitHub with the repository.
 - Attests the same result a second time under a subject the gate can compute from the tag alone: the SHA256 of the tagged commit id (subject name `git:<owner>/<repo>@<commit>`). The gate gets the commit for the tag from GitHub, hashes it, fetches the attestation by that digest, verifies signer, source and commit, and reads the result from the predicate. Nothing from the producer, no run to pick, no artifact retention.
 - Uploads `result.json` and the Sigstore bundle as a workflow artifact, for humans.
-- Fails the run when any blocking check failed.
+- Fails the run when any blocking check failed or could not run.
 
 Example usage, the file a patch repository carries on its patch branch ([template](templates/osera-fitness.yaml)):
 
@@ -53,7 +53,7 @@ Nothing else: the organisation FORK-001 expects, the library version the actions
 
 Outputs:
 
-- `result`: `pass`, `warn` or `fail`.
+- `result`: `pass`, `warn`, `fail` or `not-tested`.
 
 3rd-party actions used:
 
@@ -74,9 +74,9 @@ One composite action per requirement, under [`.github/actions`](.github/actions)
 | Action | Requirement | What it checks |
 |---|---|---|
 | `fork-001-req-001` | FORK-001.REQ-001 | repository in the expected organisation |
-| `fork-001-req-002` | FORK-001.REQ-002 | repository name `patch-<project>` |
-| `fork-002-req-001` | FORK-002.REQ-001 | `patch/<version>` branch exists and contains the release tag |
-| `fork-003-req-001` | FORK-003.REQ-001 | `v<VERSION>+patch.baseline` exists, resolves, is an ancestor of the release tag |
+| `fork-001-req-002` | FORK-001.REQ-002 | repository name `patch-<name>`; the suffix is compared with the fork parent, an artifact name is left to the gate |
+| `fork-002-req-001` | FORK-002.REQ-001 | a `patch/<version>` or `patch/<major.minor>.x` branch exists and contains the release tag |
+| `fork-003-req-001` | FORK-003.REQ-001 | `v<VERSION>+patch.baseline` exists and points strictly before the release tag on the same history |
 | `src-002-req-001` | SRC-002.REQ-001 | every fix in `.osera/patch-evidence.yaml` links an upstream commit, pull request, advisory or release note |
 | `src-002-req-002` | SRC-002.REQ-002 (SHOULD, advisory) | commits naming an upstream commit carry a `Co-authored-by` trailer, not applicable when none does |
 | `src-003-req-001` | SRC-003.REQ-001 | new source or test files since the baseline carry the header of the nearest same type file (years, whitespace and asterisks ignored), not applicable when no convention exists |
@@ -91,29 +91,36 @@ ControlPlane proposals, not requirements on the site, put to the working group o
 | `proposal-rel-004-producer-approved` | CP-REL-004-02 | that producer is in the approved producers file ([`approved-producers/approved_producers.yaml`](approved-producers/approved_producers.yaml), the playground copy of the standards site's approved producer list in the shape proposed on #52; the real file is on the standards repository and is empty) |
 | `proposal-rel-004-accounts-in-entry` | CP-REL-004-03 | the account that pushed the tag and the accounts on the commits between the baseline tag and the release tag are all in that entry's `github_users` |
 
-Every action takes the same inputs (`tag`, `repository`, `expected-org`, `approved-producers`, `actor`, `results-dir`), sources [`lib/record.sh`](lib/record.sh) (the version and baseline tag derived from the release tag, and the one `record` function every check calls) and writes one JSON record with the standard, the requirement, the site's check id, the status and the evidence. The artifact side checks (REL-002 bytecode level, REL-003 version pattern, REL-004 at the upload and at publication, REL-005 files and checksums, FEED-001) belong to the gate and are not here.
+Actions take no inputs: the workflow sets the `OSERA_*` environment once and every action reads it. Each sources [`lib/record.sh`](lib/record.sh) and reads the same way: `check_is` names the requirement, `expect` states the rule with the actual values in it, `step` names what is being done, `ev` runs a command and keeps its command line, exit code and output as evidence, `record` writes the status and what was observed. A check that dies before recording is written as `not-tested` with the step that failed and the evidence gathered so far. The artifact side checks (REL-002 bytecode level, REL-003 version pattern, REL-004 at the upload and at publication, REL-005 files and checksums, FEED-001) belong to the gate and are not here.
 
 ## The result
 
-`result.json` keeps the fitness page's shape and adds two lists:
+`result.json` keeps the fitness page's fields. `checks` has one entry per requirement, `standards` one status per standard, `proposals` the ControlPlane entries in the same shape:
 
 ```json
 {
   "standard_pack": "OSERA-SP-0.1.0", "pack_checksum": null,
-  "repository": "finos-osera/patch-jackson-core", "release": "v2.14.2+osera-patch.001", "commit": "21869d05...",
-  "artifact_digest": null, "producer": "moderne", "result": "pass",
+  "repository": "d1gital-f/patch-commons-codec", "release": "v1.16.0+osera-patch.001", "commit": "5c4ae60a...",
+  "artifact_digest": null, "library": "d1gital-f/osera-fitness-checks@4dcdf38...", "producer": "d1gital-f playground producr",
+  "result": "fail",
   "signature": "see the GitHub artifact attestation on this file",
-  "checks": [{"standard": "FORK-001", "standard_version": "0.1.0", "status": "pass", "evidence": "FORK-001.REQ-001 pass; FORK-001.REQ-002 pass"}],
-  "requirements": [{"standard": "FORK-001", "requirement": "FORK-001.REQ-001", "check": "FORK-001.CHECK-001", "status": "pass", "evidence": "..."}],
-  "proposals": [{"standard": "REL-004", "requirement": "CP-REL-004-01", "status": "pass", "evidence": "..."}]
+  "standards": [{"standard": "FORK-003", "standard_version": "0.1.0", "status": "fail"}],
+  "checks": [{
+    "standard": "FORK-003", "standard_version": "0.1.0", "requirement": "FORK-003.REQ-001", "check": "FORK-003.CHECK-001",
+    "status": "fail",
+    "expected": "tag v1.16.0+patch.baseline exists and points to a commit strictly before v1.16.0+osera-patch.001 on the same history",
+    "observed": "no tag v1.16.0+patch.baseline (baseline tags present: none)",
+    "evidence": [{"command": "git tag --list v1.16.0+patch.baseline *+patch.baseline", "exit": 0, "output": ""}]
+  }],
+  "proposals": [{"standard": "REL-004", "requirement": "CP-REL-004-02", "check": null, "status": "warn", "expected": "...", "observed": "...", "evidence": []}]
 }
 ```
 
-One status per standard is the worst of its requirements; not applicable never outranks pass. The signed copy lives in GitHub's attestation store for the patch repository (and, for a public repository, in Sigstore's transparency log), under two subjects: the digest of `result.json`, for `gh attestation verify result.json`, and the SHA256 of the tagged commit id, for the gate. The gate fetches and verifies it at upload time and keeps it with the artifact. To find it by hand: `printf '%s' <commit> | sha256sum`, then `gh api repos/<owner>/<repo>/attestations/sha256:<digest>`.
+`expected` is the rule in words with the actual values in it, `observed` what the repository showed, `evidence` the commands that showed it with their real output (first 40 lines). One rollup everywhere: any fail is a fail, then warn, then not-tested, then pass; not-applicable only when everything underneath is. The signed copy lives in GitHub's attestation store for the patch repository (and, for a public repository, in Sigstore's transparency log), under two subjects: the digest of `result.json`, for `gh attestation verify result.json`, and the SHA256 of the tagged commit id, for the gate. The gate fetches and verifies it at upload time and keeps it with the artifact. To find it by hand: `printf '%s' <commit> | sha256sum`, then `gh api repos/<owner>/<repo>/attestations/sha256:<digest>`.
 
 ## Testing
 
-- [lint](.github/workflows/lint.yaml): actionlint on the workflows, shellcheck on every action's bash.
+- [lint](.github/workflows/lint.yaml): actionlint (release binary, checksum pinned) on the workflows, shellcheck on every action's bash.
 - [e2e](.github/workflows/e2e.yaml): runs the fitness workflow itself against two reference repositories at their release tags (the workflow honours the `reference` input only when its caller is the library): the known good, `patch-jackson-core`, and the known mistakes, `patch-commons-codec` (no baseline tag, a fix without an upstream link, a producer name with a typo), each compared with its expected list under [`e2e/`](e2e/). A check that cannot run at all records `not-tested` rather than disappearing from the result.
 
 ## Notes

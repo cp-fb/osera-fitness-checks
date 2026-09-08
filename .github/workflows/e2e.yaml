@@ -6,6 +6,8 @@ on:
     branches: ['main']
   workflow_dispatch:
 
+permissions: {} # nothing unless a job says so
+
 jobs:
   # one run per reference repository, through the reusable workflow itself (the workflow honours the reference input
   # only when its caller is the library): the known good and the known mistakes
@@ -44,7 +46,7 @@ jobs:
         run: |
           failed=0
           for ref in patch-jackson-core patch-commons-codec; do
-            jq -r '(.requirements + .proposals)[] | "\(.requirement) \(.status)"' "osera-fitness-result-$ref/result.json" > "actual-$ref.txt"
+            jq -r '(.checks + .proposals)[] | "\(.requirement) \(.status)"' "osera-fitness-result-$ref/result.json" > "actual-$ref.txt"
             if diff "e2e/expected-$ref.txt" "actual-$ref.txt"; then echo "e2e $ref: every status as expected"; else echo "e2e $ref: DIFFERS from the expected list"; failed=1; fi
           done
           exit "$failed"

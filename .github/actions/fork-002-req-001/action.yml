@@ -10,9 +10,12 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
-        check_is FORK-002 FORK-002.REQ-001 "FORK-002.CHECK-001"
-        BRANCH="patch/${VERSION}"
-        REF="refs/remotes/origin/${BRANCH}"; git rev-parse -q --verify "$REF" >/dev/null || REF="refs/heads/${BRANCH}"
-        if ! git rev-parse -q --verify "$REF" >/dev/null; then record FORK-002 FORK-002.REQ-001 FORK-002.CHECK-001 fail "branch $BRANCH does not exist"
-        elif git merge-base --is-ancestor "refs/tags/$OSERA_TAG" "$REF"; then record FORK-002 FORK-002.REQ-001 FORK-002.CHECK-001 pass "branch $BRANCH exists and contains $OSERA_TAG"
-        else record FORK-002 FORK-002.REQ-001 FORK-002.CHECK-001 fail "branch $BRANCH exists but does not contain $OSERA_TAG"; fi
+        check_is FORK-002 FORK-002.REQ-001 FORK-002.CHECK-001
+        expect "a branch patch/$VERSION or patch/$LINE exists and contains the release tag $OSERA_TAG"
+        step "listing the patch branches"
+        WITH_TAG="$(ev git branch -r --list "origin/patch/$VERSION" "origin/patch/$LINE" --contains "refs/tags/$OSERA_TAG")"
+        ALL="$(ev git branch -r --list 'origin/patch/*')"
+        WITH_TAG="$(sed 's/^[ *]*//' <<<"$WITH_TAG" | paste -sd, -)"; ALL="$(sed 's/^[ *]*//' <<<"$ALL" | paste -sd, -)"
+        if [ -n "$WITH_TAG" ]; then record pass "branch $WITH_TAG contains $OSERA_TAG"
+        elif [ -z "$ALL" ]; then record fail "no patch/ branch in the repository"
+        else record fail "patch branches present ($ALL), none is patch/$VERSION or patch/$LINE containing $OSERA_TAG"; fi

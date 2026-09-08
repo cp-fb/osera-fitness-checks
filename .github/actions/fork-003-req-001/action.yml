@@ -10,8 +10,14 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
-        check_is FORK-003 FORK-003.REQ-001 "FORK-003.CHECK-001"
-        SHA="$(git rev-parse -q --verify "refs/tags/${BASE}^{commit}" || true)"
-        if [ -z "$SHA" ]; then record FORK-003 FORK-003.REQ-001 FORK-003.CHECK-001 fail "tag $BASE missing"
-        elif git merge-base --is-ancestor "$SHA" "refs/tags/$OSERA_TAG"; then record FORK-003 FORK-003.REQ-001 FORK-003.CHECK-001 pass "$BASE resolves to $SHA and is an ancestor of $OSERA_TAG"
-        else record FORK-003 FORK-003.REQ-001 FORK-003.CHECK-001 fail "$BASE ($SHA) is not an ancestor of $OSERA_TAG"; fi
+        check_is FORK-003 FORK-003.REQ-001 FORK-003.CHECK-001
+        expect "tag $BASE exists and points to a commit strictly before $OSERA_TAG on the same history"
+        step "listing the baseline tags"
+        TAGS="$(ev git tag --list "$BASE" '*+patch.baseline')"
+        grep -qxF "$BASE" <<<"$TAGS" || record fail "no tag $BASE (baseline tags present: $(paste -sd, - <<<"${TAGS:-none}"))"
+        BASE_SHA="$(ev git rev-parse "refs/tags/${BASE}^{commit}")"; REL_SHA="$(ev git rev-parse "refs/tags/${OSERA_TAG}^{commit}")"
+        if [ "$BASE_SHA" = "$REL_SHA" ]; then record fail "$BASE and $OSERA_TAG point to the same commit $BASE_SHA, the baseline must come before the patch"
+        elif ev git merge-base --is-ancestor "$BASE_SHA" "$REL_SHA" >/dev/null; then
+          N="$(ev git rev-list --count "$BASE_SHA..$REL_SHA")"
+          record pass "$BASE is $BASE_SHA, $N commit(s) before $OSERA_TAG ($REL_SHA)"
+        else record fail "$BASE ($BASE_SHA) is not an ancestor of $OSERA_TAG ($REL_SHA)"; fi

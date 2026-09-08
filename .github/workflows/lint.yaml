@@ -5,6 +5,8 @@ on:
   push:
     branches: ['main']
 
+permissions: {} # nothing unless a job says so
+
 jobs:
   actionlint:
     runs-on: ubuntu-latest
@@ -13,8 +15,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install actionlint
-        run: bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.12
+      - name: Install actionlint 1.7.12 from the release tarball, checksum pinned
+        run: |
+          curl -sSL -o actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz" | sha256sum -c -
+          tar xzf actionlint.tar.gz actionlint
       - name: Run actionlint on the workflows
         run: find .github/workflows -name '*.yaml' | xargs ./actionlint
       - name: Run shellcheck on the shared library and on every action's bash

@@ -10,7 +10,9 @@ runs:
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
-        check_is FORK-001 FORK-001.REQ-001 "FORK-001.CHECK-001"
-        ORG="${OSERA_REPOSITORY%%/*}"
-        if [ "$ORG" = "$OSERA_EXPECTED_ORG" ]; then record FORK-001 FORK-001.REQ-001 FORK-001.CHECK-001 pass "repository $OSERA_REPOSITORY is in $OSERA_EXPECTED_ORG"
-        else record FORK-001 FORK-001.REQ-001 FORK-001.CHECK-001 fail "repository $OSERA_REPOSITORY is not in $OSERA_EXPECTED_ORG"; fi
+        check_is FORK-001 FORK-001.REQ-001 FORK-001.CHECK-001
+        expect "repository $OSERA_REPOSITORY is owned by the organisation $OSERA_EXPECTED_ORG"
+        step "reading the repository owner from the GitHub API"
+        OWNER="$(ev gh api "repos/$OSERA_REPOSITORY" --jq '"\(.owner.login) (id \(.owner.id), \(.owner.type))"')"
+        if [ "${OWNER%% *}" = "$OSERA_EXPECTED_ORG" ]; then record pass "owner is $OWNER"
+        else record fail "owner is $OWNER, not $OSERA_EXPECTED_ORG"; fi

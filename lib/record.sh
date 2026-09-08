@@ -6,34 +6,52 @@
 # Shared by every check action. The actions take no inputs: they read the job environment the fitness workflow sets
 # once in its first step (OSERA_TAG, OSERA_REPOSITORY, OSERA_EXPECTED_ORG, OSERA_APPROVED_PRODUCERS, OSERA_ACTOR,
 # OSERA_RESULTS_DIR, OSERA_PACK, OSERA_LIBRARY). Only OSERA_TAG and OSERA_REPOSITORY are required, the rest default here.
-# The one way a check records its verdict:
-#   record <standard> <requirement> <check id or empty> <status> <evidence>
-# Writes one JSON record per requirement into $OSERA_RESULTS_DIR, prints one log line,
-# and returns failure when the status is fail (which turns the step red).
+#
+# A check reads like this:
+#   check_is <standard> <requirement> <check id or empty>   names the check; one record per requirement
+#   expect "<the rule in words, with the actual values in it>" what a pass needs
+#   step "<what is being done>"                             named so that a crash reads as "could not run: <step> failed"
+#   ev <command...>                                         runs the command, keeps the command line, exit code and output
+#                                                           as evidence, prints the output, returns the command's exit code
+#   record <status> "<what was observed>"                   writes the record and returns failure when the status is fail
 # Status values are the fitness page's: pass, warn, fail, not-tested, not-applicable, manual-evidence-required.
 : "${OSERA_TAG:?OSERA_TAG is required}"; : "${OSERA_REPOSITORY:?OSERA_REPOSITORY is required}"
 : "${OSERA_EXPECTED_ORG:=finos-osera}"; : "${OSERA_APPROVED_PRODUCERS:=.osera-fitness/approved-producers/approved_producers.yaml}"
 : "${OSERA_ACTOR:=${GITHUB_ACTOR:-}}"; : "${OSERA_PACK:=OSERA-SP-0.1.0}"; : "${OSERA_LIBRARY:=}"
-export OSERA_EXPECTED_ORG OSERA_APPROVED_PRODUCERS OSERA_ACTOR OSERA_PACK OSERA_LIBRARY
-mkdir -p "${OSERA_RESULTS_DIR:=.osera-results}"
+: "${OSERA_RESULTS_DIR:=${RUNNER_TEMP:-.}/osera-results}"
+export OSERA_EXPECTED_ORG OSERA_APPROVED_PRODUCERS OSERA_ACTOR OSERA_PACK OSERA_LIBRARY OSERA_RESULTS_DIR
+mkdir -p "$OSERA_RESULTS_DIR"
 VERSION="${OSERA_TAG#v}"; VERSION="${VERSION%%+*}"   # v2.14.2+osera-patch.001 -> 2.14.2
+LINE="${VERSION%.*}.x"                               # 2.14.x, the maintained line form FORK-002 also allows
 BASE="v${VERSION}+patch.baseline"                    # the baseline tag FORK-003 requires
-export VERSION BASE
-# Every check names itself first: check_is <standard> <requirement> <check id or empty>. If the check then dies on an
-# unexpected error (a missing baseline tag, a git failure), the exit trap records not-tested with the failing command,
-# so the requirement never silently disappears from the result.
-check_is() { CHECK_STD="$1"; CHECK_REQ="$2"; CHECK_ID="$3"; }
+export VERSION LINE BASE
+EXPECTED=""; STEP=""
+check_is() { CHECK_STD="$1"; CHECK_REQ="$2"; CHECK_ID="$3"; EVFILE="$OSERA_RESULTS_DIR/.$CHECK_REQ.evidence"; : > "$EVFILE"; }
+expect() { EXPECTED="$1"; }
+step() { STEP="$1"; }
+ev() {
+  local out rc=0
+  out="$("$@" 2>&1)" || rc=$?
+  jq -cn --arg command "$*" --argjson exit "$rc" --arg output "$(printf '%s' "$out" | head -n 40 | head -c 4000)" \
+     '{command: $command, exit: $exit, output: $output}' >> "$EVFILE"
+  printf '%s\n' "$out"
+  return "$rc"
+}
+record() {
+  jq -n --arg standard "$CHECK_STD" --arg requirement "$CHECK_REQ" --arg check "$CHECK_ID" --arg status "$1" \
+        --arg expected "$EXPECTED" --arg observed "$2" --slurpfile evidence "$EVFILE" \
+        '{standard: $standard, standard_version: "0.1.0", requirement: $requirement,
+          check: (if $check == "" then null else $check end), status: $status,
+          expected: $expected, observed: $observed, evidence: $evidence}' > "$OSERA_RESULTS_DIR/$CHECK_REQ.json"
+  echo "$CHECK_REQ $1: $2"
+  [ "$1" != "fail" ]
+}
+# If the check dies before recording (a git failure, a missing file), the requirement is recorded as not-tested
+# with the step that failed and the evidence gathered so far, so it never silently disappears from the result.
 on_exit() {
   local rc=$?
   if [ "$rc" -ne 0 ] && [ -n "${CHECK_REQ:-}" ] && [ ! -f "$OSERA_RESULTS_DIR/$CHECK_REQ.json" ]; then
-    record "$CHECK_STD" "$CHECK_REQ" "$CHECK_ID" not-tested "check could not run: '${LAST_COMMAND:-?}' failed" || true
+    record not-tested "could not run: ${STEP:-the check} failed" || true
   fi
 }
-trap 'LAST_COMMAND=$BASH_COMMAND' DEBUG
 trap on_exit EXIT
-record() {
-  jq -n --arg standard "$1" --arg requirement "$2" --arg check "$3" --arg status "$4" --arg evidence "$5" \
-     '$ARGS.named + {standard_version: "0.1.0"} | .check |= (if . == "" then null else . end)' > "$OSERA_RESULTS_DIR/$2.json"
-  echo "$2 $4: $5"
-  [ "$4" != "fail" ]
-}
