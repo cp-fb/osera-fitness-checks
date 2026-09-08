@@ -6,7 +6,7 @@ inputs:
     description: 'the release tag under test, for example v2.14.2+osera-patch.001'
     required: true
   repository:
-    description: 'the patch repository under test, owner/name (GitHub does not let a workflow override GITHUB_REPOSITORY)'
+    description: 'the patch repository under test, owner/name'
     required: false
     default: ${{ github.repository }}
   expected-org:
