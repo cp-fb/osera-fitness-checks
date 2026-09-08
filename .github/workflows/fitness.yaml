@@ -34,11 +34,15 @@ jobs:
         env:
           CALLER: ${{ github.repository }}
           OSERA_TAG: ${{ inputs.tag }}
+          THIS_COMMIT: ${{ github.sha }}
         run: |
-          if [ "$CALLER" = "$LIBRARY" ]; then TARGET="$REFERENCE"; else TARGET="$CALLER"; fi
+          # a producer's run checks the producer's repository with the actions at the released tag;
+          # the library's own e2e checks the reference with the actions at the commit under test
+          if [ "$CALLER" = "$LIBRARY" ]; then TARGET="$REFERENCE"; REF="$THIS_COMMIT"; else TARGET="$CALLER"; REF="$LIBRARY_REF"; fi
           echo "repository=$TARGET" >> "$GITHUB_OUTPUT"
           echo "owner=${LIBRARY%%/*}" >> "$GITHUB_OUTPUT"
-          echo "checking $TARGET at $OSERA_TAG, library $LIBRARY at $LIBRARY_REF"
+          echo "library-ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "checking $TARGET at $OSERA_TAG, library $LIBRARY at $REF"
       - name: Checkout the patch repository at the tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,7 +55,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.LIBRARY }}
-          ref: ${{ env.LIBRARY_REF }}
+          ref: ${{ steps.target.outputs.library-ref }}
           path: .osera-fitness
       - name: The exact library commit the checks run from, recorded in the result
         id: library
