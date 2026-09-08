@@ -65,7 +65,7 @@ Callers pin the moving major tag, `@v1`. Releases are exact tags (`v1.0.0`, `v1.
 
 ## Actions
 
-One composite action per requirement, under [`.github/actions`](.github/actions). Bash only: git for the repository, yq for the evidence file and the registry, jq for the record.
+One composite action per requirement, under [`.github/actions`](.github/actions). Bash only: git for the repository, yq for the evidence file and the approved producers file, jq for the record.
 
 | Action | Requirement | What it checks |
 |---|---|---|
@@ -84,10 +84,10 @@ ControlPlane proposals, not requirements on the site, put to the working group o
 | Action | Id in the result | What it checks |
 |---|---|---|
 | `proposal-rel-004-producer-named` | CP-REL-004-01 | the evidence file has a producer line |
-| `proposal-rel-004-producer-in-registry` | CP-REL-004-02 | that producer has an entry in the approved producer registry ([`registry/approved_producers.yaml`](registry/approved_producers.yaml), the playground copy in the shape proposed on #52; the real file is on the standards repository and is empty) |
+| `proposal-rel-004-producer-approved` | CP-REL-004-02 | that producer is in the approved producers file ([`approved-producers/approved_producers.yaml`](approved-producers/approved_producers.yaml), the playground copy of the standards site's approved producer list in the shape proposed on #52; the real file is on the standards repository and is empty) |
 | `proposal-rel-004-accounts-in-entry` | CP-REL-004-03 | the account that pushed the tag and the accounts on the commits between the baseline tag and the release tag are all in that entry's `github_users` |
 
-Every action takes the same inputs (`tag`, `expected-org`, `registry`, `actor`, `results-dir`) and writes one JSON record with the standard, the requirement, the site's check id, the status and the evidence. The artifact side checks (REL-002 bytecode level, REL-003 version pattern, REL-004 at the upload and at publication, REL-005 files and checksums, FEED-001) belong to the gate and are not here.
+Every action takes the same inputs (`tag`, `repository`, `expected-org`, `approved-producers`, `actor`, `results-dir`) and writes one JSON record with the standard, the requirement, the site's check id, the status and the evidence. The artifact side checks (REL-002 bytecode level, REL-003 version pattern, REL-004 at the upload and at publication, REL-005 files and checksums, FEED-001) belong to the gate and are not here.
 
 ## The result
 

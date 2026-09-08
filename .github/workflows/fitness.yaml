@@ -112,7 +112,7 @@ jobs:
           tag: ${{ inputs.tag }}
           repository: ${{ steps.target.outputs.repository }}
       - name: CP-REL-004-02 (proposal)
-        uses: ./.osera-fitness/.github/actions/proposal-rel-004-producer-in-registry
+        uses: ./.osera-fitness/.github/actions/proposal-rel-004-producer-approved
         continue-on-error: true
         with:
           tag: ${{ inputs.tag }}

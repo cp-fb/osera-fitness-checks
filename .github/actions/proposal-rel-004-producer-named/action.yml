@@ -13,10 +13,10 @@ inputs:
     description: 'organisation the patch repositories must live in (FORK-001)'
     required: false
     default: 'finos-osera'
-  registry:
-    description: 'the approved producer registry file (the REL-004 proposals)'
+  approved-producers:
+    description: 'the approved producers file (the REL-004 proposals)'
     required: false
-    default: '.osera-fitness/registry/approved_producers.yaml'
+    default: '.osera-fitness/approved-producers/approved_producers.yaml'
   actor:
     description: 'the account that pushed the tag (the REL-004 proposals)'
     required: false
@@ -34,7 +34,7 @@ runs:
         OSERA_TAG: ${{ inputs.tag }}
         OSERA_REPOSITORY: ${{ inputs.repository }}
         OSERA_EXPECTED_ORG: ${{ inputs.expected-org }}
-        OSERA_REGISTRY: ${{ inputs.registry }}
+        OSERA_APPROVED_PRODUCERS: ${{ inputs.approved-producers }}
         OSERA_ACTOR: ${{ inputs.actor }}
         OSERA_RESULTS_DIR: ${{ inputs.results-dir }}
         GH_TOKEN: ${{ github.token }}
