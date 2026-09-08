@@ -40,14 +40,7 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        mkdir -p "$OSERA_RESULTS_DIR"
-        record() { # record <standard> <requirement> <check id or empty> <status> <evidence>
-          jq -n --arg standard "$1" --arg requirement "$2" --arg check "$3" --arg status "$4" --arg evidence "$5" \
-            '{standard: $standard, standard_version: "0.1.0", requirement: $requirement, check: (if $check == "" then null else $check end), status: $status, evidence: $evidence}' \
-            > "$OSERA_RESULTS_DIR/$2.json"
-          echo "$2 $4: $5"
-          [ "$4" != "fail" ]
-        }
+        source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
         ORG="${OSERA_REPOSITORY%%/*}"
         if [ "$ORG" = "$OSERA_EXPECTED_ORG" ]; then record FORK-001 FORK-001.REQ-001 FORK-001.CHECK-001 pass "repository $OSERA_REPOSITORY is in $OSERA_EXPECTED_ORG"
         else record FORK-001 FORK-001.REQ-001 FORK-001.CHECK-001 fail "repository $OSERA_REPOSITORY is not in $OSERA_EXPECTED_ORG"; fi

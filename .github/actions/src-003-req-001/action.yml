@@ -40,16 +40,7 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        VERSION="${OSERA_TAG#v}"; VERSION="${VERSION%%+*}"
-        BASE="v${VERSION}+patch.baseline"
-        mkdir -p "$OSERA_RESULTS_DIR"
-        record() { # record <standard> <requirement> <check id or empty> <status> <evidence>
-          jq -n --arg standard "$1" --arg requirement "$2" --arg check "$3" --arg status "$4" --arg evidence "$5" \
-            '{standard: $standard, standard_version: "0.1.0", requirement: $requirement, check: (if $check == "" then null else $check end), status: $status, evidence: $evidence}' \
-            > "$OSERA_RESULTS_DIR/$2.json"
-          echo "$2 $4: $5"
-          [ "$4" != "fail" ]
-        }
+        source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
         # the leading block comment of a file, years replaced by YEAR, whitespace and asterisks removed; empty when the file does not start with one
         header() { git show "${OSERA_TAG}:$1" | awk 'BEGIN{c=0} c==0 && /^[[:space:]]*$/ {next} c==0 && $0 !~ /^[[:space:]]*\/\*/ {exit} {c=1; print} /\*\// {exit}' | sed -E 's/(19|20)[0-9]{2}([[:space:]]*[-,][[:space:]]*(19|20)[0-9]{2})*/YEAR/g' | tr -d " \t\r\n*"; }
         # the nearest existing file of the same extension and kind (test or main), walking up the directories

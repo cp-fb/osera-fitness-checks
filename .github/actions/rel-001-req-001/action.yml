@@ -40,15 +40,7 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        VERSION="${OSERA_TAG#v}"; VERSION="${VERSION%%+*}"
-        mkdir -p "$OSERA_RESULTS_DIR"
-        record() { # record <standard> <requirement> <check id or empty> <status> <evidence>
-          jq -n --arg standard "$1" --arg requirement "$2" --arg check "$3" --arg status "$4" --arg evidence "$5" \
-            '{standard: $standard, standard_version: "0.1.0", requirement: $requirement, check: (if $check == "" then null else $check end), status: $status, evidence: $evidence}' \
-            > "$OSERA_RESULTS_DIR/$2.json"
-          echo "$2 $4: $5"
-          [ "$4" != "fail" ]
-        }
+        source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
         F=.osera/patch-evidence.yaml
         [ -f "$F" ] || record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "$F missing"
         MISSING=""; for K in commit command runtime report result; do V="$(yq -r ".tests.$K // \"\"" "$F")"; [ -n "$V" ] || MISSING="$MISSING $K"; done

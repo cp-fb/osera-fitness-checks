@@ -17,8 +17,9 @@ jobs:
         run: bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.12
       - name: Run actionlint on the workflows
         run: find .github/workflows -name '*.yaml' | xargs ./actionlint
-      - name: Run shellcheck on the actions
+      - name: Run shellcheck on the shared library and on every action's bash
         run: |
+          shellcheck -s bash lib/record.sh
           for f in .github/actions/*/action.yml; do
-            yq '.runs.steps[] | select(.shell == "bash") | .run' "$f" | shellcheck -s bash -S warning -e SC2016,SC2086 - || { echo "shellcheck failed on $f"; exit 1; }
+            yq '.runs.steps[] | select(.shell == "bash") | .run' "$f" | shellcheck -s bash -S warning -e SC2016,SC2086,SC1090,SC1091 - || { echo "shellcheck failed on $f"; exit 1; }
           done
