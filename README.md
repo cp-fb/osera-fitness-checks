@@ -21,7 +21,8 @@ The [fitness](.github/workflows/fitness.yaml) workflow checks a patch repository
 - Runs the ControlPlane proposals (REL-004 early warnings), which warn and never fail the run.
 - Writes `result.json` in the shape of the [fitness page](https://standards.osera.finos.org/fitness/), one status per standard, with the per requirement records and the proposals underneath.
 - Attests `result.json` with GitHub Attestations: an in-toto statement, predicate type `https://osera.finos.org/fitness-result/v1`, signed with the workflow's OIDC identity through Sigstore, stored by GitHub with the repository.
-- Uploads `result.json` and the Sigstore bundle as a workflow artifact.
+- Attests the same result a second time under a subject the gate can compute from the tag alone: the SHA256 of the tagged commit id (subject name `git:<owner>/<repo>@<commit>`). The gate gets the commit for the tag from GitHub, hashes it, fetches the attestation by that digest, verifies signer, source and commit, and reads the result from the predicate. Nothing from the producer, no run to pick, no artifact retention.
+- Uploads `result.json` and the Sigstore bundle as a workflow artifact, for humans.
 - Fails the run when any blocking check failed.
 
 Example usage, the file a patch repository carries on its patch branch ([template](templates/osera-fitness.yaml)):
@@ -108,7 +109,7 @@ Every action takes the same inputs (`tag`, `repository`, `expected-org`, `approv
 }
 ```
 
-One status per standard is the worst of its requirements; not applicable never outranks pass. The signed copy lives in GitHub's attestation store for the patch repository (and, for a public repository, in Sigstore's transparency log). The gate fetches and verifies it at upload time and keeps it with the artifact.
+One status per standard is the worst of its requirements; not applicable never outranks pass. The signed copy lives in GitHub's attestation store for the patch repository (and, for a public repository, in Sigstore's transparency log), under two subjects: the digest of `result.json`, for `gh attestation verify result.json`, and the SHA256 of the tagged commit id, for the gate. The gate fetches and verifies it at upload time and keeps it with the artifact. To find it by hand: `printf '%s' <commit> | sha256sum`, then `gh api repos/<owner>/<repo>/attestations/sha256:<digest>`.
 
 ## Testing
 
