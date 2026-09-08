@@ -1,26 +1,7 @@
 name: write the fitness result
 description: "Collect the per requirement records into result.json: the shape of the fitness page (one status per standard) with the requirements and the ControlPlane proposals listed underneath"
 author: ControlPlane for the FINOS OSERA Exchange
-inputs:
-  tag:
-    description: 'the release tag under test'
-    required: true
-  repository:
-    description: 'the patch repository under test, owner/name'
-    required: false
-    default: ${{ github.repository }}
-  pack:
-    description: 'the standards pack the checks target'
-    required: false
-    default: 'OSERA-SP-0.1.0'
-  results-dir:
-    description: 'where the records are'
-    required: false
-    default: '.osera-results'
-  library:
-    description: 'the library that produced the result, owner/name@commit'
-    required: false
-    default: ''
+# Reads the job environment set by the fitness workflow (OSERA_TAG, OSERA_REPOSITORY, OSERA_PACK, OSERA_RESULTS_DIR, OSERA_LIBRARY). No inputs.
 outputs:
   result:
     description: 'pass, warn or fail'
@@ -31,12 +12,6 @@ runs:
     - name: Write result.json
       id: result
       shell: bash
-      env:
-        OSERA_TAG: ${{ inputs.tag }}
-        OSERA_REPOSITORY: ${{ inputs.repository }}
-        OSERA_PACK: ${{ inputs.pack }}
-        OSERA_RESULTS_DIR: ${{ inputs.results-dir }}
-        OSERA_LIBRARY: ${{ inputs.library }}
       run: |
         set -euo pipefail
         COMMIT="$(git rev-parse "refs/tags/${OSERA_TAG}^{commit}")"

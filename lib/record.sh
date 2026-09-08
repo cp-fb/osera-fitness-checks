@@ -3,11 +3,18 @@
 # Built by ControlPlane for the FINOS OSERA Exchange.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Shared by every check action: the one way a check records its verdict.
+# Shared by every check action. The actions take no inputs: they read the job environment the fitness workflow sets
+# once in its first step (OSERA_TAG, OSERA_REPOSITORY, OSERA_EXPECTED_ORG, OSERA_APPROVED_PRODUCERS, OSERA_ACTOR,
+# OSERA_RESULTS_DIR, OSERA_PACK, OSERA_LIBRARY). Only OSERA_TAG and OSERA_REPOSITORY are required, the rest default here.
+# The one way a check records its verdict:
 #   record <standard> <requirement> <check id or empty> <status> <evidence>
 # Writes one JSON record per requirement into $OSERA_RESULTS_DIR, prints one log line,
 # and returns failure when the status is fail (which turns the step red).
 # Status values are the fitness page's: pass, warn, fail, not-tested, not-applicable, manual-evidence-required.
+: "${OSERA_TAG:?OSERA_TAG is required}"; : "${OSERA_REPOSITORY:?OSERA_REPOSITORY is required}"
+: "${OSERA_EXPECTED_ORG:=finos-osera}"; : "${OSERA_APPROVED_PRODUCERS:=.osera-fitness/approved-producers/approved_producers.yaml}"
+: "${OSERA_ACTOR:=${GITHUB_ACTOR:-}}"; : "${OSERA_PACK:=OSERA-SP-0.1.0}"; : "${OSERA_LIBRARY:=}"
+export OSERA_EXPECTED_ORG OSERA_APPROVED_PRODUCERS OSERA_ACTOR OSERA_PACK OSERA_LIBRARY
 mkdir -p "${OSERA_RESULTS_DIR:=.osera-results}"
 VERSION="${OSERA_TAG#v}"; VERSION="${VERSION%%+*}"   # v2.14.2+osera-patch.001 -> 2.14.2
 BASE="v${VERSION}+patch.baseline"                    # the baseline tag FORK-003 requires

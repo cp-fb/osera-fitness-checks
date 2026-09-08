@@ -1,43 +1,12 @@
 name: SRC-002.REQ-002
 description: "Backported commits carrying upstream-authored code should name the upstream commit and include a Co-authored-by trailer for the upstream author (SHOULD, advisory)"
 author: ControlPlane for the FINOS OSERA Exchange
-inputs:
-  tag:
-    description: 'the release tag under test, for example v2.14.2+osera-patch.001'
-    required: true
-  repository:
-    description: 'the patch repository under test, owner/name'
-    required: false
-    default: ${{ github.repository }}
-  expected-org:
-    description: 'organisation the patch repositories must live in (FORK-001)'
-    required: false
-    default: 'finos-osera'
-  approved-producers:
-    description: 'the approved producers file (the REL-004 proposals)'
-    required: false
-    default: '.osera-fitness/approved-producers/approved_producers.yaml'
-  actor:
-    description: 'the account that pushed the tag (the REL-004 proposals)'
-    required: false
-    default: ${{ github.actor }}
-  results-dir:
-    description: 'where the record goes'
-    required: false
-    default: '.osera-results'
+# Reads the job environment set by the fitness workflow (see lib/record.sh for the list of OSERA_* variables). No inputs.
 runs:
   using: composite
   steps:
     - name: SRC-002.REQ-002
       shell: bash
-      env:
-        OSERA_TAG: ${{ inputs.tag }}
-        OSERA_REPOSITORY: ${{ inputs.repository }}
-        OSERA_EXPECTED_ORG: ${{ inputs.expected-org }}
-        OSERA_APPROVED_PRODUCERS: ${{ inputs.approved-producers }}
-        OSERA_ACTOR: ${{ inputs.actor }}
-        OSERA_RESULTS_DIR: ${{ inputs.results-dir }}
-        GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
         source "$GITHUB_ACTION_PATH/../../../lib/record.sh"
