@@ -12,16 +12,16 @@ on:
         description: 'pass, warn or fail'
         value: ${{ jobs.fitness.outputs.result }}
 
-# Fixed in this file, never taken from the caller: where this library lives (also the organisation FORK-001 expects),
-# and the reference repository the library's own e2e checks. At the move to finos-osera these two lines change.
-env:
-  LIBRARY: d1gital-f/osera-fitness-checks
-  LIBRARY_REF: v1 # the moving major tag the callers pin; the actions are checked out at it too, and the result records the exact commit
-  REFERENCE: d1gital-f/patch-jackson-core
-
 jobs:
   fitness:
     runs-on: ubuntu-latest
+    # Fixed here, never taken from the caller: where this library lives (also the organisation FORK-001 expects),
+    # the tag the actions are checked out at, and the reference repository the library's own e2e checks.
+    # At the move to finos-osera these lines change and nothing else.
+    env:
+      LIBRARY: d1gital-f/osera-fitness-checks
+      LIBRARY_REF: v1 # the moving major tag the callers pin; the result records the exact commit it resolved to
+      REFERENCE: d1gital-f/patch-jackson-core
     outputs:
       result: ${{ steps.result.outputs.result }}
     permissions:
@@ -33,9 +33,12 @@ jobs:
         id: target
         env:
           CALLER: ${{ github.repository }}
+          OSERA_TAG: ${{ inputs.tag }}
         run: |
-          if [ "$CALLER" = "$LIBRARY" ]; then echo "repository=$REFERENCE" >> "$GITHUB_OUTPUT"; else echo "repository=$CALLER" >> "$GITHUB_OUTPUT"; fi
+          if [ "$CALLER" = "$LIBRARY" ]; then TARGET="$REFERENCE"; else TARGET="$CALLER"; fi
+          echo "repository=$TARGET" >> "$GITHUB_OUTPUT"
           echo "owner=${LIBRARY%%/*}" >> "$GITHUB_OUTPUT"
+          echo "checking $TARGET at $OSERA_TAG, library $LIBRARY at $LIBRARY_REF"
       - name: Checkout the patch repository at the tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
