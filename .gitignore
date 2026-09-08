@@ -1,0 +1,9 @@
+.fixture/
+.osera-results/
+result.json
+result.sigstore.json
+actual.txt
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/

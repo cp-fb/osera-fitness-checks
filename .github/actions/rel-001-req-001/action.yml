@@ -1,0 +1,64 @@
+name: REL-001.REQ-001
+description: "Patch providers must publish test provenance for the patched artifact: the tested commit, test command or suite, runtime, test report, and passing test result"
+author: ControlPlane for the FINOS OSERA Exchange
+inputs:
+  tag:
+    description: 'the release tag under test, for example v2.14.2+osera-patch.001'
+    required: true
+  repository:
+    description: 'the patch repository under test, owner/name (GitHub does not let a workflow override GITHUB_REPOSITORY)'
+    required: false
+    default: ${{ github.repository }}
+  expected-org:
+    description: 'organisation the patch repositories must live in (FORK-001)'
+    required: false
+    default: 'finos-osera'
+  registry:
+    description: 'the approved producer registry file (the REL-004 proposals)'
+    required: false
+    default: '.osera-fitness/registry/approved_producers.yaml'
+  actor:
+    description: 'the account that pushed the tag (the REL-004 proposals)'
+    required: false
+    default: ${{ github.actor }}
+  results-dir:
+    description: 'where the record goes'
+    required: false
+    default: '.osera-results'
+runs:
+  using: composite
+  steps:
+    - name: REL-001.REQ-001
+      shell: bash
+      env:
+        OSERA_TAG: ${{ inputs.tag }}
+        OSERA_REPOSITORY: ${{ inputs.repository }}
+        OSERA_EXPECTED_ORG: ${{ inputs.expected-org }}
+        OSERA_REGISTRY: ${{ inputs.registry }}
+        OSERA_ACTOR: ${{ inputs.actor }}
+        OSERA_RESULTS_DIR: ${{ inputs.results-dir }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        VERSION="${OSERA_TAG#v}"; VERSION="${VERSION%%+*}"
+        mkdir -p "$OSERA_RESULTS_DIR"
+        record() { # record <standard> <requirement> <check id or empty> <status> <evidence>
+          jq -n --arg standard "$1" --arg requirement "$2" --arg check "$3" --arg status "$4" --arg evidence "$5" \
+            '{standard: $standard, standard_version: "0.1.0", requirement: $requirement, check: (if $check == "" then null else $check end), status: $status, evidence: $evidence}' \
+            > "$OSERA_RESULTS_DIR/$2.json"
+          echo "$2 $4: $5"
+          [ "$4" != "fail" ]
+        }
+        F=.osera/patch-evidence.yaml
+        [ -f "$F" ] || record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "$F missing"
+        MISSING=""; for K in commit command runtime report result; do V="$(yq -r ".tests.$K // \"\"" "$F")"; [ -n "$V" ] || MISSING="$MISSING $K"; done
+        [ -z "$MISSING" ] || record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "tests block missing:$MISSING"
+        HEAD_SHA="$(git rev-parse "refs/tags/${OSERA_TAG}^{commit}")"; TESTED="$(yq -r .tests.commit "$F")"
+        if [ "${HEAD_SHA#"$TESTED"}" = "$HEAD_SHA" ]; then
+          # the release tag may sit after the tested commit when the commits in between only add OSERA plumbing: the evidence file, the caller workflow
+          EXTRA="$(git diff --name-only "$TESTED" "$HEAD_SHA" | grep -vE '^(\.osera/patch-evidence\.yaml|\.github/workflows/osera-fitness\.ya?ml)$' || true)"
+          if [ -n "$EXTRA" ] || [ -z "$(git diff --name-only "$TESTED" "$HEAD_SHA")" ]; then record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "tested commit ${TESTED:0:12} differs from the tagged commit ${HEAD_SHA:0:12} beyond the OSERA plumbing files: $(echo "$EXTRA" | paste -sd, -)"; fi
+        fi
+        RESULT="$(yq -r .tests.result "$F" | tr "[:upper:]" "[:lower:]")"
+        [ "$RESULT" = pass ] || record REL-001 REL-001.REQ-001 REL-001.CHECK-001 fail "test result is $RESULT, not pass"
+        record REL-001 REL-001.REQ-001 REL-001.CHECK-001 pass "tests on ${HEAD_SHA:0:12}: $(yq -r .tests.command "$F") on $(yq -r .tests.runtime "$F"), report $(yq -r .tests.report "$F"), result pass (report contents checked at the gate)"

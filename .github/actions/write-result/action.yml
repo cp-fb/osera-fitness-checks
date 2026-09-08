@@ -1,0 +1,58 @@
+name: write the fitness result
+description: "Collect the per requirement records into result.json: the shape of the fitness page (one status per standard) with the requirements and the ControlPlane proposals listed underneath"
+author: ControlPlane for the FINOS OSERA Exchange
+inputs:
+  tag:
+    description: 'the release tag under test'
+    required: true
+  repository:
+    description: 'the patch repository under test, owner/name'
+    required: false
+    default: ${{ github.repository }}
+  pack:
+    description: 'the standards pack the checks target'
+    required: false
+    default: 'OSERA-SP-0.1.0'
+  results-dir:
+    description: 'where the records are'
+    required: false
+    default: '.osera-results'
+outputs:
+  result:
+    description: 'pass, warn or fail'
+    value: ${{ steps.result.outputs.result }}
+runs:
+  using: composite
+  steps:
+    - name: Write result.json
+      id: result
+      shell: bash
+      env:
+        OSERA_TAG: ${{ inputs.tag }}
+        OSERA_REPOSITORY: ${{ inputs.repository }}
+        OSERA_PACK: ${{ inputs.pack }}
+        OSERA_RESULTS_DIR: ${{ inputs.results-dir }}
+      run: |
+        set -euo pipefail
+        COMMIT="$(git rev-parse "refs/tags/${OSERA_TAG}^{commit}")"
+        PRODUCER="$(yq -r '.producer // ""' .osera/patch-evidence.yaml 2>/dev/null || true)"
+        jq -s --arg pack "$OSERA_PACK" --arg repo "$OSERA_REPOSITORY" --arg release "$OSERA_TAG" --arg commit "$COMMIT" --arg producer "$PRODUCER" '
+          # one status per standard: any fail is a fail, then warn, then not-tested, then pass; not-applicable only when every requirement is not applicable
+          def rollup: map(.status) as $s
+            | if any($s[]; . == "fail") then "fail"
+              elif any($s[]; . == "warn" or . == "manual-evidence-required") then "warn"
+              elif any($s[]; . == "not-tested") then "not-tested"
+              elif any($s[]; . == "pass") then "pass"
+              else "not-applicable" end;
+          (map(select(.requirement | startswith("CP-") | not))) as $reqs
+          | (map(select(.requirement | startswith("CP-")))) as $props
+          | ($reqs | group_by(.standard) | map({standard: .[0].standard, standard_version: "0.1.0", status: rollup, evidence: (map("\(.requirement) \(.status)") | join("; "))})) as $checks
+          | {standard_pack: $pack, pack_checksum: null, repository: $repo, release: $release, commit: $commit, artifact_digest: null,
+             producer: (if $producer == "" then null else $producer end),
+             result: (if any($checks[]; .status == "fail") then "fail" elif any($checks[]; .status == "warn") then "warn" else "pass" end),
+             signature: "see the GitHub artifact attestation on this file",
+             checks: $checks,
+             requirements: ($reqs | map({standard, requirement, check, status, evidence})),
+             proposals: ($props | map({standard, requirement, status, evidence}))}' "$OSERA_RESULTS_DIR"/*.json > result.json
+        echo "result=$(jq -r .result result.json)" >> "$GITHUB_OUTPUT"
+        jq . result.json

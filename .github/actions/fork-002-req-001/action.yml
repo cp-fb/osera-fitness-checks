@@ -1,0 +1,56 @@
+name: FORK-002.REQ-001
+description: "Patch providers must create version-scoped source workflow branches using patch/<version>"
+author: ControlPlane for the FINOS OSERA Exchange
+inputs:
+  tag:
+    description: 'the release tag under test, for example v2.14.2+osera-patch.001'
+    required: true
+  repository:
+    description: 'the patch repository under test, owner/name (GitHub does not let a workflow override GITHUB_REPOSITORY)'
+    required: false
+    default: ${{ github.repository }}
+  expected-org:
+    description: 'organisation the patch repositories must live in (FORK-001)'
+    required: false
+    default: 'finos-osera'
+  registry:
+    description: 'the approved producer registry file (the REL-004 proposals)'
+    required: false
+    default: '.osera-fitness/registry/approved_producers.yaml'
+  actor:
+    description: 'the account that pushed the tag (the REL-004 proposals)'
+    required: false
+    default: ${{ github.actor }}
+  results-dir:
+    description: 'where the record goes'
+    required: false
+    default: '.osera-results'
+runs:
+  using: composite
+  steps:
+    - name: FORK-002.REQ-001
+      shell: bash
+      env:
+        OSERA_TAG: ${{ inputs.tag }}
+        OSERA_REPOSITORY: ${{ inputs.repository }}
+        OSERA_EXPECTED_ORG: ${{ inputs.expected-org }}
+        OSERA_REGISTRY: ${{ inputs.registry }}
+        OSERA_ACTOR: ${{ inputs.actor }}
+        OSERA_RESULTS_DIR: ${{ inputs.results-dir }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        VERSION="${OSERA_TAG#v}"; VERSION="${VERSION%%+*}"
+        mkdir -p "$OSERA_RESULTS_DIR"
+        record() { # record <standard> <requirement> <check id or empty> <status> <evidence>
+          jq -n --arg standard "$1" --arg requirement "$2" --arg check "$3" --arg status "$4" --arg evidence "$5" \
+            '{standard: $standard, standard_version: "0.1.0", requirement: $requirement, check: (if $check == "" then null else $check end), status: $status, evidence: $evidence}' \
+            > "$OSERA_RESULTS_DIR/$2.json"
+          echo "$2 $4: $5"
+          [ "$4" != "fail" ]
+        }
+        BRANCH="patch/${VERSION}"
+        REF="refs/remotes/origin/${BRANCH}"; git rev-parse -q --verify "$REF" >/dev/null || REF="refs/heads/${BRANCH}"
+        if ! git rev-parse -q --verify "$REF" >/dev/null; then record FORK-002 FORK-002.REQ-001 FORK-002.CHECK-001 fail "branch $BRANCH does not exist"
+        elif git merge-base --is-ancestor "refs/tags/$OSERA_TAG" "$REF"; then record FORK-002 FORK-002.REQ-001 FORK-002.CHECK-001 pass "branch $BRANCH exists and contains $OSERA_TAG"
+        else record FORK-002 FORK-002.REQ-001 FORK-002.CHECK-001 fail "branch $BRANCH exists but does not contain $OSERA_TAG"; fi

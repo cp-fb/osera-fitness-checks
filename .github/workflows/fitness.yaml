@@ -1,0 +1,148 @@
+name: fitness
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'the release tag under test, for example v2.14.2+osera-patch.001'
+        required: true
+        type: string
+      repository:
+        description: 'the patch repository to check (owner/name); defaults to the calling repository'
+        required: false
+        default: ${{ github.repository }}
+        type: string
+      expected-org:
+        description: 'organisation the patch repositories must live in (FORK-001)'
+        required: false
+        default: 'finos-osera'
+        type: string
+      library-ref:
+        description: 'which version of this library to run the checks from'
+        required: false
+        default: 'main'
+        type: string
+    outputs:
+      result:
+        description: 'pass, warn or fail'
+        value: ${{ jobs.fitness.outputs.result }}
+
+jobs:
+  fitness:
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.result.outputs.result }}
+    permissions:
+      contents: read # for checking out the patch repository and reading its commits through the API.
+      id-token: write # for creating OIDC tokens for signing.
+      attestations: write # for GitHub Attestations.
+    steps:
+      - name: Checkout the patch repository at the tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - name: Fetch every branch and tag
+        run: git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*' && git fetch --tags origin
+      - name: Checkout the check library
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/osera-fitness-checks
+          ref: ${{ inputs.library-ref }}
+          path: .osera-fitness
+      - name: FORK-001.REQ-001
+        uses: ./.osera-fitness/.github/actions/fork-001-req-001
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+          expected-org: ${{ inputs.expected-org }}
+      - name: FORK-001.REQ-002
+        uses: ./.osera-fitness/.github/actions/fork-001-req-002
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: FORK-002.REQ-001
+        uses: ./.osera-fitness/.github/actions/fork-002-req-001
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: FORK-003.REQ-001
+        uses: ./.osera-fitness/.github/actions/fork-003-req-001
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: SRC-002.REQ-001
+        uses: ./.osera-fitness/.github/actions/src-002-req-001
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: SRC-002.REQ-002
+        uses: ./.osera-fitness/.github/actions/src-002-req-002
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: SRC-003.REQ-001
+        uses: ./.osera-fitness/.github/actions/src-003-req-001
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: REL-001.REQ-001
+        uses: ./.osera-fitness/.github/actions/rel-001-req-001
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: CP-REL-004-01 (proposal)
+        uses: ./.osera-fitness/.github/actions/proposal-rel-004-producer-named
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: CP-REL-004-02 (proposal)
+        uses: ./.osera-fitness/.github/actions/proposal-rel-004-producer-in-registry
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: CP-REL-004-03 (proposal)
+        uses: ./.osera-fitness/.github/actions/proposal-rel-004-accounts-in-entry
+        continue-on-error: true
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: Write the result
+        id: result
+        uses: ./.osera-fitness/.github/actions/write-result
+        with:
+          tag: ${{ inputs.tag }}
+          repository: ${{ inputs.repository }}
+      - name: Attest the result
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: result.json
+          predicate-type: https://osera.finos.org/fitness-result/v1
+          predicate-path: result.json
+      - name: Keep the bundle next to the result
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" result.sigstore.json
+      - name: Upload the result and its bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: osera-fitness-result
+          path: |
+            result.json
+            result.sigstore.json
+      - name: Blocking checks decide
+        env:
+          RESULT: ${{ steps.result.outputs.result }}
+        run: test "$RESULT" != "fail"
