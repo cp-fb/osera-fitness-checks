@@ -29,7 +29,7 @@ jobs:
       id-token: write # for creating OIDC tokens for signing.
       attestations: write # for GitHub Attestations.
     steps:
-      - name: The repository under test is the caller, or the reference when the library tests itself
+      - name: Setting the workflow caller (a fork or the library itself for e2e testing)
         id: target
         env:
           CALLER: ${{ github.repository }}
